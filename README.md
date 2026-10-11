@@ -18,8 +18,12 @@ model, beam decoder, and eval harness are in and tested end to end.
 synthetic Hirtreiter pairs reaches top-5 exact 81.1% and 98.2% parseable
 outputs on their test split (bars 80% / 95%; published 89.2% top-5, 74.8%
 top-1; ours 42.0% top-1). Details and next levers in
-[`docs/poc0.md`](docs/poc0.md). Next: WS1 simulator harvest (DWSIM, Aspen,
-Pyomo, DEXPI) toward ~1,000 real flowsheets.
+[`docs/poc0.md`](docs/poc0.md).
+
+**Next: PoC-1, the output-space bake-off** (BLUEPRINT §8). String generation
+vs. loop-set prediction over the PFD graph, judged by data efficiency at
+1k–10k pairs — the regime real data will be in. Decision rule is fixed in the
+blueprint. WS1 simulator harvest (DWSIM, Aspen, Pyomo, DEXPI) follows.
 
 ## Quick start
 

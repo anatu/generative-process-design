@@ -640,7 +640,7 @@ The P&ID string = `render(pfd_graph, loops)` — deterministic, grammar-valid by
 
 *What this does not change.* Task A (autocompletion) and open-ended synthesis stay token/graph generation; their analogue of this revision is graph-native autoregressive generation with degree masks (WS5.2 constrained decoding first, graph generation later).
 
-*Sequencing.* (1) Grammar-constrained decoding on the seq2seq baseline — one week, closes the 1.8% unparseable. (2) `Loop`, `parse_loops`, `render` + contract test. (3) Encoder with graph features + per-node heads + pointer + masks; supervised on 10k. (4) RL after WS4. Runs alongside WS1, not instead of it.
+*Sequencing.* Governed by **PoC-1** (§8): shared contract layer and constrained decoding first, then the bake-off against the seq2seq baseline at 1k / 10k, then the fixed decision rule. RL fine-tuning only after WS4 and only for whichever model survives PoC-1.
 
 #### WS5.4 Task C — Correction (`gpd/models/seq2seq.py`, shared arch)
 
@@ -770,27 +770,74 @@ Fallback: model too slow on CPU → int8 dynamic quantization; still too slow �
 |---|---|---|
 | **M0 Foundation** | 1 | CI green; round-trip property tests pass; `fetch` works; WS0 verification items resolved and fallbacks chosen |
 | **PoC-0 Vertical slice** ✅ 2026-10-11 | 2–3 | PFD→P&ID seq2seq trained on Hirtreiter data alone, evaluated on their test split. Pass: top-5 exact ≥ 80% (published 89.2%), top-1 grammar-valid ≥ 95%. **Result: 81.1% / 98.2% with 100k pairs** (`docs/poc0.md`). Track A confirmed. Public repo live. |
-| **M1 First harvest** | 5 | DWSIM + Pyomo + DEXPI + PID2Graph extractors pass acceptance; ≥ 600 real records `grammar_ok`; data-quality gates wired |
-| **M2 Corpus v1** | 7 | ≥ 1,000 real (or written variance explanation); Hirtreiter ingested; ≥ 50k synthetic; frozen test set committed; `commercial` profile builds with 0 unknown licenses; rules R01–R33 implemented |
-| **M3 Models v1** | 9 | Tasks A/B/C trained; eval harness + `baselines.json`; Task B within 5 pts of published; ablations logged; Track B decision made |
-| **M4 Copilot + Phase 3 gate** | 12 | API + CLI pass contract tests; latency targets met on CPU or GPU-only documented; WS3 pilots judged; go/no-go recorded in `BLUEPRINT.md` §10 |
-| **M5 Release v1** | 16 | Success criteria table (§1) all green or waived in writing; Phase 3 data integrated if go; corpus + model cards + license summary written |
+| **PoC-1 Output-space bake-off** ← **next** | 3–5 | Decides Task B's architecture by data efficiency, not peak accuracy. Seq2seq (string generation) vs loop-set prediction (§WS5.3 v2), same test split, same metrics (loop F1, rendered top-5), training sizes 1k / 10k / 100k. Gate: the decision rule below is applied and recorded in §10. Blocks M1 (WS1 harvest) only for the two shared-infrastructure items (loop contract layer, constrained decoding); extractor work may start in parallel in week 5. |
+| **M1 First harvest** | 7 | DWSIM + Pyomo + DEXPI + PID2Graph extractors pass acceptance; ≥ 600 real records `grammar_ok`; data-quality gates wired |
+| **M2 Corpus v1** | 9 | ≥ 1,000 real (or written variance explanation); Hirtreiter ingested; ≥ 50k synthetic; frozen test set committed; `commercial` profile builds with 0 unknown licenses; rules R01–R33 implemented |
+| **M3 Models v1** | 11 | Tasks A/B/C trained; eval harness + `baselines.json`; Task B within 5 pts of published; ablations logged; Track B decision made |
+| **M4 Copilot + Phase 3 gate** | 14 | API + CLI pass contract tests; latency targets met on CPU or GPU-only documented; WS3 pilots judged; go/no-go recorded in `BLUEPRINT.md` §10 |
+| **M5 Release v1** | 18 | Success criteria table (§1) all green or waived in writing; Phase 3 data integrated if go; corpus + model cards + license summary written |
+
+### PoC-1 protocol and decision rule
+
+**Why this is the next proof point.** The real corpus will hold hundreds of control-annotated flowsheets (DEXPI ~14 realistic P&IDs plus whatever TU Delft releases), never 100k. The model that learns the task from 1k–10k examples is the one that will work on real data. Matching published numbers on 100k synthetic pairs is a comparability checkpoint, not the goal. PoC-0 showed the seq2seq model needs 100k to reach 81% top-5 and gets 36% at 10k.
+
+**Shared work (week 3, both branches need it, nothing wasted):**
+1. `gpd/models/loops.py`: `Loop`, `parse_loops(pid_graph)`, `render(pfd_graph, loops)`. Contract test `render(pfd, parse_loops(pid)) == canonical(pid)` over the full Hirtreiter corpus; gate ≥ 99%.
+2. Loop-level precision / recall / F1 added to `gpd/eval/benchmarks.py` for **any** model (seq2seq outputs are parsed with `parse_loops`).
+3. Grammar-constrained decoding for the seq2seq baseline (`gpd/models/decode.py`): mask tokens that cannot extend a parseable string, checked at unit boundaries.
+
+**Diagnostic (week 3, one day):** oracle re-ranking on the existing 100k seq2seq model. For each test pair, can a rule/DOF check pick the correct hypothesis out of the beam-5? Report "oracle top-1". If it recovers most of the 33-point top-1 gap, the seq2seq already holds the engineering knowledge; if little, the misses are modeling errors and structured output is the fix. Either way the number is recorded.
+
+**Bake-off (weeks 4–5):**
+- Loop model per §WS5.3 v2 (graph-featured encoder, per-node heads, pointer head, DOF masks), ~5–10M params, trained at 1k and 10k (100k if cheap).
+- Seq2seq baseline already has 10k and 100k results; add 1k. Optional: 25M-param seq2seq on 100k, if a GPU is available, to test whether string generation saturates.
+- Same test split (`test_data_1k`), same metrics, scaling curve plotted in `docs/poc1.md`.
+
+**Decision rule (fixed now, applied at week 5):**
+
+| Loop model, trained on 10k, rendered top-5 on Hirtreiter test | Decision |
+|---|---|
+| **≥ 81%** (seq2seq needed 100k for this) | **Switch.** Loop-set prediction becomes Task B. Seq2seq kept only as the published-comparability baseline. |
+| **36–81%** (between seq2seq at 10k and at 100k) | **Keep both** through M3. Run both scaling curves to 100k; choose at M3 by the slope at 1k–10k, the real-data regime. |
+| **≤ 36%** (no better than seq2seq at 10k) | **Formulation or bug.** One week of debugging, hard cap. If still ≤ 36%, stay with seq2seq; invest in constrained decoding, oracle-guided re-ranking, and the 25M model. |
+
+Secondary criteria, recorded alongside: loop F1 (primary engineering metric), parse rate (loop model expected 100%), training wall-time per 1k pairs, and the 1k-pair result for each model (the regime that matters for real data).
+
+**Kill criterion for the scaling branch:** if a 25M-param seq2seq on 100k does not reach top-1 ≥ 60%, string generation is saturating on this task and only the structured path reaches engineer-grade top-1.
+
+**Budget.** Two weeks, one engineer, this machine (loop model is small and needs no beam search). Cloud GPU only for the optional 25M seq2seq.
 
 ---
 
-## 9. Week 1–3 task list (WS0 → PoC-0)
+## 9. Task list
 
-1. ~~Scaffold repo, `pyproject.toml`, `Makefile`, CI skeleton, `ruff`/`mypy` config.~~ done 2026-10-11
-2. ~~Add SFILES2 submodule; write `vocab.py` from upstream mapping; vocab test.~~ done 2026-10-11
-3. ~~Implement `ir.py`, `record.py`, `sfiles.py`, `hashing.py`; Hypothesis strategies; round-trip + hash property tests.~~ done 2026-10-11
-4. `sources.yaml` + `fetch.py` with checksum lock; fetch Hirtreiter.
-5. Hirtreiter ingest (WS2.1) → `PairRecord` JSONL with their splits preserved; parse-rate report.
-6. Tokenizer (WS5.1) with round-trip contract test over the whole Hirtreiter corpus.
-7. Task B seq2seq (WS5.3), trainer, beam decoder, eval harness with `baselines.json`.
-8. Train on Hirtreiter; record PoC-0 result; Track A/B decision in §10.
-9. Publish repo (MIT). CI green on first push.
-10. Resolve remaining WS0 verification items (DWSIM tags, Aspen `.bkp`) at WS1 start.
-11. Send three emails: TU Delft PIR (withheld 312 / 1,005 / 100k), IIT Bombay (SynthPID), FOSSEE (license).
+### Weeks 1–3: WS0 → PoC-0 — done 2026-10-11
+
+1. ~~Scaffold repo, `pyproject.toml`, `Makefile`, CI skeleton, `ruff`/`mypy` config.~~
+2. ~~Add SFILES2 submodule; write `vocab.py` from upstream mapping; vocab test.~~
+3. ~~Implement `ir.py`, `record.py`, `sfiles.py`, `hashing.py`; Hypothesis strategies; round-trip + hash property tests.~~
+4. ~~`sources.yaml` + `fetch.py` with checksum lock; fetch Hirtreiter.~~
+5. ~~Hirtreiter ingest (WS2.1) → `PairRecord` JSONL with their splits preserved; parse-rate report.~~
+6. ~~Tokenizer (WS5.1) with round-trip contract test over the whole Hirtreiter corpus.~~
+7. ~~Task B seq2seq (WS5.3), trainer, beam decoder, eval harness with `baselines.json`.~~
+8. ~~Train on Hirtreiter; record PoC-0 result; Track A/B decision in §10.~~
+9. ~~Publish repo (MIT). CI green on first push.~~
+
+### Weeks 3–5: PoC-1 output-space bake-off — **next**
+
+10. `gpd/models/loops.py`: `Loop`, `parse_loops`, `render`; contract test over the Hirtreiter corpus (gate ≥ 99%).
+11. Loop-level P/R/F1 in `gpd/eval/benchmarks.py`; re-score the PoC-0 100k model with it.
+12. Oracle re-ranking diagnostic on the PoC-0 beam-5 outputs; record oracle top-1 in `docs/poc1.md`.
+13. Grammar-constrained decoding in `gpd/models/decode.py`; re-evaluate the 100k seq2seq.
+14. Loop model: graph-featured encoder, per-node `(variable, kind)` heads, pointer head, DOF masks; trainer; greedy per-node decoding.
+15. Train loop model at 1k and 10k; seq2seq at 1k; same test split; scaling curve in `docs/poc1.md`.
+16. Apply the PoC-1 decision rule (§8); record the decision in §10. Update WS5.3 accordingly.
+
+### Week 5+: WS1 (may start in parallel with 14–16)
+
+17. Resolve remaining WS0 verification items (DWSIM tags, Aspen `.bkp`).
+18. WS1.1 DWSIM extractor against the 9 SFILES2 sample graphs + downloaded `.dwxmz`.
+19. Send three emails: TU Delft PIR (withheld 312 / 1,005 / 100k; also ask which train size / split produced 74.8 / 89.2), IIT Bombay (SynthPID), FOSSEE (license).
 
 ---
 
@@ -811,6 +858,7 @@ Fallback: model too slow on CPU → int8 dynamic quantization; still too slow �
 | 2026-10-11 | PoC-0 model: 7.5M-param encoder-decoder (d=256, 4+4 layers), tied embeddings with std d_model^-0.5 init. | Default N(0,1) tied init gave initial loss 238 vs ln(V)=4.8. `tests/unit/test_model_init.py` guards it. |
 | 2026-10-11 | **PoC-0 run 1 (10k pairs): FAIL.** top-1 16.5%, top-5 35.8%, parses 80.6% (bars 80% / 95%). Underfit: val loss still falling at epoch 30. 100k run launched; Track A/B decision deferred to it. | `docs/poc0.md`. 19% unparseable outputs motivate grammar-constrained decoding (WS5.2) as a near-term item, not a later polish. |
 | 2026-10-11 | **PoC-0 run 2 (100k pairs): PASS.** top-1 42.0%, top-5 81.1%, parses 98.2%. Published 74.8 / 89.2. **Track A continues; Track B not triggered.** Milestone PoC-0 closed. | Same 7.5M model; data volume was the constraint. Next levers for top-1: larger model + longer schedule, validity-layer beam re-ranking, grammar-constrained decoding. `regression_floor` set in `baselines.json`. |
+| 2026-10-11 | **PoC-1 (output-space bake-off) is the next proof point**, ahead of WS1 harvest. Decision rule fixed in §8: loop model at 10k ≥ 81% top-5 → switch; 36–81% → keep both to M3, choose by 1k–10k slope; ≤ 36% → one week debug cap, then stay with seq2seq. Kill criterion for scaling: 25M seq2seq on 100k must reach top-1 ≥ 60%. M1–M5 shift +2 weeks. | Data efficiency decides, because the real corpus will be hundreds of examples, not 100k. Shared work (loop contract layer, loop F1, constrained decoding) is needed by both branches. |
 | 2026-10-11 | **Task B design revision: loop-set prediction (WS5.3 v2).** Predict control loops `(measured, variable, kind, actuated)` over the PFD graph with engineering masks (DOF, one-actuator-per-loop, inventory classes); render the string deterministically. Seq2seq stays as the comparability baseline. Target: ≥ 81% top-5 from 10k pairs. | The seq2seq model is a copier with a verifier outside it. Structured output puts validity and the engineering decision space inside the model and should transfer to real PFDs with hundreds, not 100k, examples. |
 | | WS0 verification: DWSIM XML tags | pending |
 | | WS0 verification: Aspen `.bkp` FLOWSHEET section | pending |
