@@ -34,7 +34,7 @@ does and in what order.
 The lower drawing is the piping and instrumentation diagram, the P&ID, for the
 same plant. The equipment and streams are unchanged; what has been added, in
 orange, is the control layer. The pump has gained a motor and a pressure
-indicator, and the feed line two flow controllers, the first driving the pump
+indicator; the feed line, two flow controllers, the first driving the pump
 motor and the second the valve. On the reactor sit a temperature indicator and
 a level controller, and the level controller acts on the bottoms valve, so that
 when the liquid rises the drain opens. The top outlet is held at pressure by a
@@ -54,9 +54,9 @@ outlet. A pump needs a motor and a flow controller on its discharge. A reactor
 is held at temperature. A vapor stream leaving a vessel is held at pressure.
 The conventions are few, but a working plant has hundreds of streams, each of
 which must be considered, and every revision of the process means considering
-them all again. That combination, a small rule set applied
-exhaustively to a large structure, is what makes the task worth automating and
-what makes it learnable.
+them all again. That combination, a small rule set applied exhaustively to a
+large structure, is what makes the task worth automating and what makes it
+learnable.
 
 ## 2. What is known, and what is missing
 
@@ -85,12 +85,12 @@ project.
 
 Molecular design has a hundred thousand times the public data that process
 design has, and the gap will not close: the drawings that would close it belong
-to the companies that commissioned them. The consequence is a ceiling. With a thousand
-real topologies and unlimited synthetic ones, a model can learn what a valid
-flowsheet looks like, complete a partial one, place a control layer, and spot
-an error, all at the accuracy the literature reports. It cannot learn to invent
-an economically sound process it has never seen, and no amount of modelling
-will change that. A copilot is what the data supports.
+to the companies that commissioned them. The consequence is a ceiling. With a
+thousand real topologies and unlimited synthetic ones, a model can learn what a
+valid flowsheet looks like, complete a partial one, place a control layer, and
+spot an error, all at the accuracy the literature reports. It cannot learn to
+invent an economically sound process it has never seen, and no amount of
+modelling will change that. A copilot is what the data supports.
 
 This repository's own first measurement makes the same point from the other
 side. A single model, 7.5 million parameters, was trained twice on the public
