@@ -602,6 +602,46 @@ Tests: `detok(tok(s)) == s` on every corpus string (contract test); every token 
 
 Target: within 5 points of 74.8 / 89.2 at M3; at or above at M5.
 
+**PoC-0 outcome (2026-10-11):** the string-to-string model above (7.5M params, 100k pairs) reaches top-5 81.1%, top-1 42.0%, parses 98.2%. It is a character copier with controllers sprinkled in: ~60% of each output is the PFD copied verbatim, every error is a syntax error before it is an engineering error, and the validity layer sits outside the generator. The revision below moves engineering structure inside the model. The seq2seq model stays as the published-comparability baseline.
+
+**Design revision — Task B v2: loop-set prediction (`gpd/models/loops.py`)**
+
+*Output space.* A P&ID is the PFD plus a set of control loops. Predict the set, render the string.
+
+```python
+class Loop(BaseModel):
+    measured: str                       # PFD node id, e.g. "r-1"
+    variable: Literal["F","T","P","L"]  # flow, temperature, pressure, level
+    kind: Literal["C","I","IR","M"]     # controller, indicator, indicating-recorder, motor
+    actuated: str | None                # PFD node id of the valve/pump/compressor; None for indicators
+```
+The P&ID string = `render(pfd_graph, loops)` — deterministic, grammar-valid by construction. `render` inserts `(C){xy}` nodes inline after the measured node, adds `(v)` actuators where the PFD lacks one on the actuated stream, numbers signal lines, and calls `graph_to_sfiles`. `parse_loops(pid_graph) -> list[Loop]` is the inverse; `render(pfd, parse_loops(pid)) == canonical(pid)` is a contract test over the entire Hirtreiter corpus.
+
+*Model.*
+- Encoder: transformer over PFD unit tokens with graph features per token (class, in/out degree, depth from feed, recycle membership, column tag) and an edge-aware attention bias (adjacency, 2-hop). Reuse the WS5.1 tokenizer; add the feature embeddings.
+- Per-node heads: for every PFD node, a multi-label classifier over `(variable, kind)` pairs — ≤ 12 options. Nodes can carry several loops (reactor: TC + LC).
+- Pointer head: for each predicted controller loop, attention over PFD nodes selects `actuated`. Candidates are restricted to actuator-capable classes (`v`, `pp`, `comp`, `blwr`, `turb`) plus "insert new valve on stream *s*", where *s* ranges over the measured node's incident streams.
+- Hard masks encode engineering invariants: one controller per actuator; no actuator on a stream already actuated; indicators have no actuator; level loops only on inventory-holding classes (`tank`, `dist`, `flash`, `r`, `sep`, …); DOF balance — number of actuated streams ≤ number of manipulable streams in the component.
+- Size: ~5–10M params. The decision space is ~12 choices per node, not 118 tokens × 130 steps.
+
+*Training.*
+- Supervised: per-node BCE on `(variable, kind)`, cross-entropy on the pointer. Labels from `parse_loops` over Hirtreiter pairs, DEXPI real P&IDs (the only real control data we have), pyDEXPI synthetic.
+- Data-efficiency target: match the seq2seq model's 81% top-5 (rendered strings, same benchmark) using the **10k** set, not 100k. That is the test of whether the structured output space generalizes better — which is what matters for real PFDs, where we will have hundreds of examples.
+- Phase 2 (after WS4): RL fine-tune with GRPO on the loop decoder. Reward = rule-pass rate (33 rules) + DOF balance + loop-level F1 against the label. The model internalizes what the verifier checks.
+- Phase 3 (after WS4.3, if the sim lane works): sparse DWSIM-convergence reward. Last, because it is slow and noisy.
+
+*Metrics.* Loop-level precision / recall / F1 (primary — what an engineer would check); rendered-string exact match top-1/top-5 on the Hirtreiter test split (comparability); parse rate (expected 100%); rule-violation rate.
+
+*Decoding.* Greedy per node is usually enough; top-k alternatives come from the per-node distributions (e.g. "TC vs TI on the reactor"), which is exactly the ambiguity that cost the seq2seq model 33 top-1 points. Beam search over the whole string disappears.
+
+*Acceptance.* Contract test `render(parse_loops(pid)) == canonical(pid)` ≥ 99% on Hirtreiter; loop F1 ≥ 0.90 on their test split; rendered top-5 ≥ 81% trained on 10k; parse rate 100%.
+
+*Risks.* (1) `render` must reproduce the authors' string conventions (controller placement inline vs bracket, valve insertion, signal numbering) or exact-match comparability is lost — the contract test is the gate. (2) The 33 rules are not implemented yet; DOF masks ship first, the rules reward later. (3) Real control placement depends on attributes the data lacks (phase, pressure level). Topology-only prediction is pattern-matching the generator's rules; node `attrs` from the WS1 simulator harvest are the way beyond that.
+
+*What this does not change.* Task A (autocompletion) and open-ended synthesis stay token/graph generation; their analogue of this revision is graph-native autoregressive generation with degree masks (WS5.2 constrained decoding first, graph generation later).
+
+*Sequencing.* (1) Grammar-constrained decoding on the seq2seq baseline — one week, closes the 1.8% unparseable. (2) `Loop`, `parse_loops`, `render` + contract test. (3) Encoder with graph features + per-node heads + pointer + masks; supervised on 10k. (4) RL after WS4. Runs alongside WS1, not instead of it.
+
 #### WS5.4 Task C — Correction (`gpd/models/seq2seq.py`, shared arch)
 
 - Data: corrupt clean records via inverted rules (WS4.2) and random edits (drop edge, swap classes, dangling stream). Pairs (corrupt → clean).
@@ -771,6 +811,7 @@ Fallback: model too slow on CPU → int8 dynamic quantization; still too slow �
 | 2026-10-11 | PoC-0 model: 7.5M-param encoder-decoder (d=256, 4+4 layers), tied embeddings with std d_model^-0.5 init. | Default N(0,1) tied init gave initial loss 238 vs ln(V)=4.8. `tests/unit/test_model_init.py` guards it. |
 | 2026-10-11 | **PoC-0 run 1 (10k pairs): FAIL.** top-1 16.5%, top-5 35.8%, parses 80.6% (bars 80% / 95%). Underfit: val loss still falling at epoch 30. 100k run launched; Track A/B decision deferred to it. | `docs/poc0.md`. 19% unparseable outputs motivate grammar-constrained decoding (WS5.2) as a near-term item, not a later polish. |
 | 2026-10-11 | **PoC-0 run 2 (100k pairs): PASS.** top-1 42.0%, top-5 81.1%, parses 98.2%. Published 74.8 / 89.2. **Track A continues; Track B not triggered.** Milestone PoC-0 closed. | Same 7.5M model; data volume was the constraint. Next levers for top-1: larger model + longer schedule, validity-layer beam re-ranking, grammar-constrained decoding. `regression_floor` set in `baselines.json`. |
+| 2026-10-11 | **Task B design revision: loop-set prediction (WS5.3 v2).** Predict control loops `(measured, variable, kind, actuated)` over the PFD graph with engineering masks (DOF, one-actuator-per-loop, inventory classes); render the string deterministically. Seq2seq stays as the comparability baseline. Target: ≥ 81% top-5 from 10k pairs. | The seq2seq model is a copier with a verifier outside it. Structured output puts validity and the engineering decision space inside the model and should transfer to real PFDs with hundreds, not 100k, examples. |
 | | WS0 verification: DWSIM XML tags | pending |
 | | WS0 verification: Aspen `.bkp` FLOWSHEET section | pending |
 | | FOSSEE license reply | pending |
