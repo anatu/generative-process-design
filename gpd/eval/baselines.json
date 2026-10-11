@@ -13,6 +13,22 @@
       "top5_exact": 0.80,
       "top1_parses": 0.95
     },
-    "ours": null
+    "ours": {
+      "pfd2pid_10k": {
+        "date": "2026-10-11",
+        "train_pairs": 10000,
+        "params": 7486582,
+        "epochs": 30,
+        "beam": 5,
+        "metrics": {
+          "top1_exact": 0.165,
+          "top5_exact": 0.358,
+          "top1_parses": 0.806,
+          "top1_is_canonical": 0.653,
+          "top1_canonical_match": 0.18
+        },
+        "pass": false
+      }
+    }
   }
 }

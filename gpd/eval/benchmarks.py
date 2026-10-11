@@ -124,6 +124,11 @@ def compare(metrics: dict[str, float], baselines: dict[str, Any], task: str) -> 
 app = typer.Typer(add_completion=False, help=__doc__)
 
 
+@app.callback()
+def _root() -> None:
+    """Benchmarks. Pick a task subcommand (keeps typer in subcommand mode with one command)."""
+
+
 @app.command()
 def pfd2pid(
     checkpoint: Path = typer.Option(...),

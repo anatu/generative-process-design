@@ -769,6 +769,7 @@ Fallback: model too slow on CPU → int8 dynamic quantization; still too slow �
 | 2026-10-11 | Hirtreiter Zenodo corpus is **synthetic** (ReadMe states it). All its records are `is_real=False`. The corpus doc's Tier A listing stands for usability, not for realness. | Affects the real-flowsheet count: Hirtreiter contributes 0 real records. The ~1,000 real target rests on WS1 alone. |
 | 2026-10-11 | Hirtreiter strings: 100% parse, 83–87% canonically idempotent (older SFILES2 ordering of recycle numbers). Train/eval on their strings verbatim for comparability; store canonical forms alongside. | `PairRecord.{pfd,pid}_is_canonical`. |
 | 2026-10-11 | PoC-0 model: 7.5M-param encoder-decoder (d=256, 4+4 layers), tied embeddings with std d_model^-0.5 init. | Default N(0,1) tied init gave initial loss 238 vs ln(V)=4.8. `tests/unit/test_model_init.py` guards it. |
+| 2026-10-11 | **PoC-0 run 1 (10k pairs): FAIL.** top-1 16.5%, top-5 35.8%, parses 80.6% (bars 80% / 95%). Underfit: val loss still falling at epoch 30. 100k run launched; Track A/B decision deferred to it. | `docs/poc0.md`. 19% unparseable outputs motivate grammar-constrained decoding (WS5.2) as a near-term item, not a later polish. |
 | | WS0 verification: DWSIM XML tags | pending |
 | | WS0 verification: Aspen `.bkp` FLOWSHEET section | pending |
 | | FOSSEE license reply | pending |
