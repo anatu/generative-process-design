@@ -26,6 +26,6 @@ layers =
     gpd.models
     gpd.corpus
     gpd.synth | gpd.extract
-    gpd.validity
+    gpd.validity | gpd.viz
     gpd.canonical
     gpd.util
