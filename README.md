@@ -14,10 +14,12 @@ representation from TU Delft's [SFILES2](https://github.com/process-intelligence
 2026-10-11. Foundation (`gpd/canonical`), Hirtreiter ingest, tokenizer, seq2seq
 model, beam decoder, and eval harness are in and tested end to end.
 
-PoC-0 run 1 (7.5M-param transformer, 10k synthetic pairs): top-1 16.5%,
-top-5 35.8% vs published 74.8 / 89.2 — **below the pass bar**, underfit. The
-100k-pair run is in progress; see [`docs/poc0.md`](docs/poc0.md). Next: WS1
-simulator harvest (DWSIM, Aspen, Pyomo, DEXPI) toward ~1,000 real flowsheets.
+**PoC-0 passed.** A 7.5M-parameter encoder-decoder trained on the 100k
+synthetic Hirtreiter pairs reaches top-5 exact 81.1% and 98.2% parseable
+outputs on their test split (bars 80% / 95%; published 89.2% top-5, 74.8%
+top-1; ours 42.0% top-1). Details and next levers in
+[`docs/poc0.md`](docs/poc0.md). Next: WS1 simulator harvest (DWSIM, Aspen,
+Pyomo, DEXPI) toward ~1,000 real flowsheets.
 
 ## Quick start
 

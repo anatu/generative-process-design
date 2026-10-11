@@ -28,7 +28,28 @@
           "top1_canonical_match": 0.18
         },
         "pass": false
+      },
+      "pfd2pid_100k": {
+        "date": "2026-10-11",
+        "train_pairs": 100000,
+        "params": 7486582,
+        "epochs": 12,
+        "beam": 5,
+        "metrics": {
+          "top1_exact": 0.42,
+          "top5_exact": 0.811,
+          "top1_parses": 0.982,
+          "top1_is_canonical": 0.781,
+          "top1_canonical_match": 0.457
+        },
+        "pass": true
       }
+    },
+    "regression_floor": {
+      "note": "Nightly CI fails if a primary metric drops more than 0.02 below these.",
+      "top1_exact": 0.42,
+      "top5_exact": 0.811,
+      "top1_parses": 0.982
     }
   }
 }

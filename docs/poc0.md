@@ -66,14 +66,40 @@ Observations:
 
 ## Result — run 2: 100k training pairs
 
-_In progress. Same model, 100,000 pairs, 12 epochs._ Rationale: the paper most
-likely trained on the 100k set; the 10k run was data-limited.
+**PASS** on both bars. Same 7.49M-parameter model, 100,000 pairs, 12 epochs
+(18,756 steps), warmup 1,000, patience 3. 64 min training, 9 min beam-5 eval.
+
+| Metric (beam 5, test 1k) | 10k run | **100k run** | Published | Pass bar |
+|---|---|---|---|---|
+| top-1 exact match | 16.5% | **42.0%** | 74.8% | — |
+| top-5 exact match | 35.8% | **81.1%** | 89.2% | ≥ 80% |
+| top-1 parses (G1) | 80.6% | **98.2%** | — | ≥ 95% |
+| top-1 is canonical (G2) | 65.3% | 78.1% | — | — |
+| top-1 canonical-equivalent to target | 18.0% | 45.7% | — | — |
+
+Validation trajectory (greedy exact on 500 pairs): 1.0 → 9.6 → 17.0 → 20.0 →
+25.0 → 32.2 → 39.0 → 42.0 → 44.0 → 45.0 → 47.0 → 47.0% over epochs 0–11.
+Val loss 0.945 → 0.808, still edging down at the end.
+
+Observations:
+- 10× data moved top-5 from 35.8% to 81.1% with the model held fixed. Data
+  volume, not architecture, was the binding constraint at 10k.
+- Top-1 lags published by 33 points while top-5 lags by 8. The model ranks the
+  right answer in its beam far more often than it ranks it first. Beam
+  re-ranking by the validity layer (grammar + rules) is a cheap next step.
+- Unparseable outputs fell from 19% to 1.8%. Grammar-constrained decoding
+  would close the rest.
+- Training was still improving at epoch 12 with the learning rate at its
+  floor. More epochs and the originally planned larger model (d=384, 6+6
+  layers, ~25M params) are the obvious levers for top-1.
 
 ## Decision
 
-Deferred to the 100k result. Rule (BLUEPRINT §WS5.5): if Track A remains > 10
-points under the published numbers with the full 100k set, start Track B
-(LoRA fine-tune of a ≤1.5B open LLM) in parallel with WS1.
+**Track A continues. Track B (LLM fine-tune) is not triggered.** The pass bars
+are met; the top-5 gap to published is under 10 points. Next steps for this
+task, in order: (1) larger model + longer schedule on 100k, (2) validity-layer
+beam re-ranking, (3) grammar-constrained decoding. These run alongside WS1,
+not instead of it.
 
 ## Caveats
 

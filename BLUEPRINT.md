@@ -729,7 +729,7 @@ Fallback: model too slow on CPU → int8 dynamic quantization; still too slow �
 | Milestone | Week | Gate (all must hold) |
 |---|---|---|
 | **M0 Foundation** | 1 | CI green; round-trip property tests pass; `fetch` works; WS0 verification items resolved and fallbacks chosen |
-| **PoC-0 Vertical slice** | 2–3 | PFD→P&ID seq2seq trained on Hirtreiter data alone, evaluated on their test split. Pass: top-5 exact ≥ 80% (published 89.2%), top-1 grammar-valid ≥ 95%. Exercises fetch → ingest → tokenizer → model → eval end to end. Decides Track A vs Track B (§WS5.5) in week 3, not week 9. Public repo goes live at this milestone. |
+| **PoC-0 Vertical slice** ✅ 2026-10-11 | 2–3 | PFD→P&ID seq2seq trained on Hirtreiter data alone, evaluated on their test split. Pass: top-5 exact ≥ 80% (published 89.2%), top-1 grammar-valid ≥ 95%. **Result: 81.1% / 98.2% with 100k pairs** (`docs/poc0.md`). Track A confirmed. Public repo live. |
 | **M1 First harvest** | 5 | DWSIM + Pyomo + DEXPI + PID2Graph extractors pass acceptance; ≥ 600 real records `grammar_ok`; data-quality gates wired |
 | **M2 Corpus v1** | 7 | ≥ 1,000 real (or written variance explanation); Hirtreiter ingested; ≥ 50k synthetic; frozen test set committed; `commercial` profile builds with 0 unknown licenses; rules R01–R33 implemented |
 | **M3 Models v1** | 9 | Tasks A/B/C trained; eval harness + `baselines.json`; Task B within 5 pts of published; ablations logged; Track B decision made |
@@ -770,6 +770,7 @@ Fallback: model too slow on CPU → int8 dynamic quantization; still too slow �
 | 2026-10-11 | Hirtreiter strings: 100% parse, 83–87% canonically idempotent (older SFILES2 ordering of recycle numbers). Train/eval on their strings verbatim for comparability; store canonical forms alongside. | `PairRecord.{pfd,pid}_is_canonical`. |
 | 2026-10-11 | PoC-0 model: 7.5M-param encoder-decoder (d=256, 4+4 layers), tied embeddings with std d_model^-0.5 init. | Default N(0,1) tied init gave initial loss 238 vs ln(V)=4.8. `tests/unit/test_model_init.py` guards it. |
 | 2026-10-11 | **PoC-0 run 1 (10k pairs): FAIL.** top-1 16.5%, top-5 35.8%, parses 80.6% (bars 80% / 95%). Underfit: val loss still falling at epoch 30. 100k run launched; Track A/B decision deferred to it. | `docs/poc0.md`. 19% unparseable outputs motivate grammar-constrained decoding (WS5.2) as a near-term item, not a later polish. |
+| 2026-10-11 | **PoC-0 run 2 (100k pairs): PASS.** top-1 42.0%, top-5 81.1%, parses 98.2%. Published 74.8 / 89.2. **Track A continues; Track B not triggered.** Milestone PoC-0 closed. | Same 7.5M model; data volume was the constraint. Next levers for top-1: larger model + longer schedule, validity-layer beam re-ranking, grammar-constrained decoding. `regression_floor` set in `baselines.json`. |
 | | WS0 verification: DWSIM XML tags | pending |
 | | WS0 verification: Aspen `.bkp` FLOWSHEET section | pending |
 | | FOSSEE license reply | pending |
