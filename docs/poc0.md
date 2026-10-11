@@ -46,8 +46,8 @@ d_model^-0.5 brings the initial loss to ≈ ln(V). Guarded by
 
 | Metric (beam 5, test 1k) | Ours (10k) | Published | Pass bar |
 |---|---|---|---|
-| top-1 exact match | 16.5% | 74.8% | — |
-| top-5 exact match | 35.8% | 89.2% | ≥ 80% |
+| top-1 exact match | 16.5% | 37.7% (10k) | — |
+| top-5 exact match | 35.8% | 74.8% (10k) | ≥ 80% |
 | top-1 parses (G1) | 80.6% | — | ≥ 95% |
 | top-1 is canonical (G2) | 65.3% | — | — |
 | top-1 canonical-equivalent to target | 18.0% | — | — |
@@ -71,8 +71,8 @@ Observations:
 
 | Metric (beam 5, test 1k) | 10k run | **100k run** | Published | Pass bar |
 |---|---|---|---|---|
-| top-1 exact match | 16.5% | **42.0%** | 74.8% | — |
-| top-5 exact match | 35.8% | **81.1%** | 89.2% | ≥ 80% |
+| top-1 exact match | 16.5% | **42.0%** | 48.6% (100k) | — |
+| top-5 exact match | 35.8% | **81.1%** | 89.2% (100k) | ≥ 80% |
 | top-1 parses (G1) | 80.6% | **98.2%** | — | ≥ 95% |
 | top-1 is canonical (G2) | 65.3% | 78.1% | — | — |
 | top-1 canonical-equivalent to target | 18.0% | 45.7% | — | — |
@@ -84,9 +84,14 @@ Val loss 0.945 → 0.808, still edging down at the end.
 Observations:
 - 10× data moved top-5 from 35.8% to 81.1% with the model held fixed. Data
   volume, not architecture, was the binding constraint at 10k.
-- Top-1 lags published by 33 points while top-5 lags by 8. The model ranks the
-  right answer in its beam far more often than it ranks it first. Beam
-  re-ranking by the validity layer (grammar + rules) is a cheap next step.
+- Against the published 100k figures (48.6% top-1, 89.2% top-5) the gaps are 6.6
+  and 8.1 points. Against the published 10k figures (37.7 / 74.8) our 10k run is
+  far behind, which marks our 10k baseline as under-trained, not the architecture
+  as weak. The model ranks the right answer in its beam far more often than it
+  ranks it first; the published model shows the same 40-point spread, which the
+  Graph-to-SFILES authors attribute to the one-to-many mapping from a PFD to its
+  valid control structures. Beam re-ranking by the validity layer is a cheap next
+  step.
 - Unparseable outputs fell from 19% to 1.8%. Grammar-constrained decoding
   would close the rest.
 - Training was still improving at epoch 12 with the learning rate at its
@@ -103,9 +108,12 @@ not instead of it.
 
 ## Caveats
 
-- The published 74.8 / 89.2 figures are quoted from the corpus document; the
-  training-set size and exact test split behind them need confirming against
-  the paper before any claim of parity.
+- Published figures, verified against the papers on 2026-10-11: Hirtreiter et
+  al. report top-5 74.8% at 10k and 89.2% at 100k training pairs; Graph-to-SFILES
+  reports the matching top-1 figures, 37.7% and 48.6%, and its own graph-encoder
+  results of 15.2 / 28.4 at 1k and 41.9 / 73.2 at 10k. All on the synthetic test
+  split of 1,000 pairs. An earlier version of this file read 74.8 / 89.2 as
+  top-1 / top-5. See `docs/lit_review_structured_generation.md` §2.2.
 - Exact match is a strict metric on non-canonical strings. The
   canonical-equivalent column reports matches after re-canonicalizing both
   sides; it is the more meaningful number for downstream use.

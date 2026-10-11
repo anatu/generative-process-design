@@ -47,7 +47,7 @@ This is the build document. Every workstream below has deliverables, interfaces,
 | Synthetic flowsheets | ≥ 50,000 | Corpus doc §3 Phase 2 |
 | Generated-output grammar validity rate | ≥ 99% | Grammar filter makes this near-guaranteed |
 | Generated-output rule-violation rate | ≤ 5% | Validity layer |
-| PFD→P&ID top-1 / top-5 on Hirtreiter test split | ≥ 70% / ≥ 85% | Published 74.8% / 89.2% |
+| PFD→P&ID top-1 / top-5 on Hirtreiter test split | ≥ 45% / ≥ 85% at 100k; ≥ 28.4% top-5 at 1k | Published 48.6% / 89.2% at 100k and 37.7% / 74.8% at 10k (seq2seq); graph encoder 15.2% / 28.4% at 1k. Corrected 2026-10-11. |
 | Autocompletion next-unit top-5 on held-out real | ≥ 70% | Graph-to-SFILES published 73.2% |
 | Correction fix rate / false-positive rate | ≥ 80% / ≤ 5% | Internal |
 | Test coverage: `canonical/`, `validity/` | ≥ 90% | Internal |
@@ -600,7 +600,7 @@ Tests: `detok(tok(s)) == s` on every corpus string (contract test); every token 
 - Train on Hirtreiter train (+ augmented) + DEXPI real control graphs + pyDEXPI synthetic. Evaluate on Hirtreiter test (published comparability) **and** on our frozen real set where control exists.
 - Metrics: exact match top-1, top-5 (beam 5), per-control-loop precision/recall; validity of outputs.
 
-Target: within 5 points of 74.8 / 89.2 at M3; at or above at M5.
+Target: within 5 points of 48.6 / 89.2 (top-1 / top-5, 100k) at M3; at or above at M5. Published figures corrected 2026-10-11; see `docs/lit_review_structured_generation.md` §2.2.
 
 **PoC-0 outcome (2026-10-11):** the string-to-string model above (7.5M params, 100k pairs) reaches top-5 81.1%, top-1 42.0%, parses 98.2%. It is a character copier with controllers sprinkled in: ~60% of each output is the PFD copied verbatim, every error is a syntax error before it is an engineering error, and the validity layer sits outside the generator. The revision below moves engineering structure inside the model. The seq2seq model stays as the published-comparability baseline.
 
@@ -632,7 +632,7 @@ The P&ID string = `render(pfd_graph, loops)` — deterministic, grammar-valid by
 
 *Metrics.* Loop-level precision / recall / F1 (primary — what an engineer would check); rendered-string exact match top-1/top-5 on the Hirtreiter test split (comparability); parse rate (expected 100%); rule-violation rate.
 
-*Decoding.* Greedy per node is usually enough; top-k alternatives come from the per-node distributions (e.g. "TC vs TI on the reactor"), which is exactly the ambiguity that cost the seq2seq model 33 top-1 points. Beam search over the whole string disappears.
+*Decoding.* Greedy per node is usually enough; top-k alternatives come from the per-node distributions (e.g. "TC vs TI on the reactor"), which is the ambiguity behind the 40-point spread between top-1 and top-5 in both our model and the published one. Beam search over the whole string disappears.
 
 *Acceptance.* Contract test `render(parse_loops(pid)) == canonical(pid)` ≥ 99% on Hirtreiter; loop F1 ≥ 0.90 on their test split; rendered top-5 ≥ 81% trained on 10k; parse rate 100%.
 
@@ -779,7 +779,7 @@ Fallback: model too slow on CPU → int8 dynamic quantization; still too slow �
 
 ### PoC-1 protocol and decision rule
 
-**Why this is the next proof point.** The real corpus will hold hundreds of control-annotated flowsheets (DEXPI ~14 realistic P&IDs plus whatever TU Delft releases), never 100k. The model that learns the task from 1k–10k examples is the one that will work on real data. Matching published numbers on 100k synthetic pairs is a comparability checkpoint, not the goal. PoC-0 showed the seq2seq model needs 100k to reach 81% top-5 and gets 36% at 10k.
+**Why this is the next proof point.** The real corpus will hold hundreds of control-annotated flowsheets (DEXPI ~14 realistic P&IDs plus whatever TU Delft releases), never 100k. The model that learns the task from 1k–10k examples is the one that will work on real data. Matching published numbers on 100k synthetic pairs is a comparability checkpoint, not the goal. PoC-0 showed the seq2seq model needs 100k to reach 81% top-5 and gets 36% at 10k; the published sequence model reaches 74.8% top-5 at 10k, so our 10k baseline is under-trained and is re-run to convergence before serving as a comparator (`docs/lit_review_structured_generation.md` §6).
 
 **Shared work (week 3, both branches need it, nothing wasted):**
 1. `gpd/models/loops.py`: `Loop`, `parse_loops(pid_graph)`, `render(pfd_graph, loops)`. Contract test `render(pfd, parse_loops(pid)) == canonical(pid)` over the full Hirtreiter corpus; gate ≥ 99%.
@@ -795,11 +795,11 @@ Fallback: model too slow on CPU → int8 dynamic quantization; still too slow �
 
 **Decision rule (fixed now, applied at week 5):**
 
-| Loop model, trained on 10k, rendered top-5 on Hirtreiter test | Decision |
+| Loop model, rendered strings, Hirtreiter test split | Decision |
 |---|---|
-| **≥ 81%** (seq2seq needed 100k for this) | **Switch.** Loop-set prediction becomes Task B. Seq2seq kept only as the published-comparability baseline. |
-| **36–81%** (between seq2seq at 10k and at 100k) | **Keep both** through M3. Run both scaling curves to 100k; choose at M3 by the slope at 1k–10k, the real-data regime. |
-| **≤ 36%** (no better than seq2seq at 10k) | **Formulation or bug.** One week of debugging, hard cap. If still ≤ 36%, stay with seq2seq; invest in constrained decoding, oracle-guided re-ranking, and the 25M model. |
+| Clears **both** bars: 1k top-5 ≥ 28.4% (published graph encoder) **and** 10k top-5 ≥ 74.8% with top-1 ≥ 41.9% (best published at 10k) | **Switch.** Loop-set prediction becomes Task B. Seq2seq kept only as the published-comparability baseline. |
+| Clears **one** bar | **Keep both** through M3. Run both scaling curves to 100k; choose at M3 by the slope at 1k–10k, the real-data regime. |
+| Clears **neither** | **Formulation or bug.** One week of debugging, hard cap. If still under, stay with seq2seq; invest in constrained decoding, oracle-guided re-ranking, and the 25M model. |
 
 Secondary criteria, recorded alongside: loop F1 (primary engineering metric), parse rate (loop model expected 100%), training wall-time per 1k pairs, and the 1k-pair result for each model (the regime that matters for real data).
 
@@ -837,7 +837,7 @@ Secondary criteria, recorded alongside: loop F1 (primary engineering metric), pa
 
 17. Resolve remaining WS0 verification items (DWSIM tags, Aspen `.bkp`).
 18. WS1.1 DWSIM extractor against the 9 SFILES2 sample graphs + downloaded `.dwxmz`.
-19. Send three emails: TU Delft PIR (withheld 312 / 1,005 / 100k; also ask which train size / split produced 74.8 / 89.2), IIT Bombay (SynthPID), FOSSEE (license).
+19. Send three emails: TU Delft PIR (withheld 312 / 1,005 / 100k), IIT Bombay (SynthPID), FOSSEE (license).
 
 ---
 
@@ -857,8 +857,9 @@ Secondary criteria, recorded alongside: loop F1 (primary engineering metric), pa
 | 2026-10-11 | Hirtreiter strings: 100% parse, 83–87% canonically idempotent (older SFILES2 ordering of recycle numbers). Train/eval on their strings verbatim for comparability; store canonical forms alongside. | `PairRecord.{pfd,pid}_is_canonical`. |
 | 2026-10-11 | PoC-0 model: 7.5M-param encoder-decoder (d=256, 4+4 layers), tied embeddings with std d_model^-0.5 init. | Default N(0,1) tied init gave initial loss 238 vs ln(V)=4.8. `tests/unit/test_model_init.py` guards it. |
 | 2026-10-11 | **PoC-0 run 1 (10k pairs): FAIL.** top-1 16.5%, top-5 35.8%, parses 80.6% (bars 80% / 95%). Underfit: val loss still falling at epoch 30. 100k run launched; Track A/B decision deferred to it. | `docs/poc0.md`. 19% unparseable outputs motivate grammar-constrained decoding (WS5.2) as a near-term item, not a later polish. |
-| 2026-10-11 | **PoC-0 run 2 (100k pairs): PASS.** top-1 42.0%, top-5 81.1%, parses 98.2%. Published 74.8 / 89.2. **Track A continues; Track B not triggered.** Milestone PoC-0 closed. | Same 7.5M model; data volume was the constraint. Next levers for top-1: larger model + longer schedule, validity-layer beam re-ranking, grammar-constrained decoding. `regression_floor` set in `baselines.json`. |
+| 2026-10-11 | **PoC-0 run 2 (100k pairs): PASS.** top-1 42.0%, top-5 81.1%, parses 98.2%. Published 48.6 / 89.2 at 100k (corrected 2026-10-11). **Track A continues; Track B not triggered.** Milestone PoC-0 closed. | Same 7.5M model; data volume was the constraint. Next levers for top-1: larger model + longer schedule, validity-layer beam re-ranking, grammar-constrained decoding. `regression_floor` set in `baselines.json`. |
 | 2026-10-11 | **PoC-1 (output-space bake-off) is the next proof point**, ahead of WS1 harvest. Decision rule fixed in §8: loop model at 10k ≥ 81% top-5 → switch; 36–81% → keep both to M3, choose by 1k–10k slope; ≤ 36% → one week debug cap, then stay with seq2seq. Kill criterion for scaling: 25M seq2seq on 100k must reach top-1 ≥ 60%. M1–M5 shift +2 weeks. | Data efficiency decides, because the real corpus will be hundreds of examples, not 100k. Shared work (loop contract layer, loop F1, constrained decoding) is needed by both branches. |
+| 2026-10-11 | **Baseline correction.** Published 74.8 / 89.2 are both top-5 (10k / 100k); top-1 are 37.7 / 48.6. Our 100k model is 6.6 / 8.1 points under, not 33 / 8. PoC-1 bars restated against the best published figure at each training size, including the 1k graph-encoder result (28.4% top-5). Literature review written: `docs/lit_review_structured_generation.md`; recommended direction: graph-anchored loop prediction with verifier alignment. | Found while reviewing Graph-to-SFILES (arXiv:2412.00508), which tabulates both metrics at 1k / 10k / 100k. |
 | 2026-10-11 | **Task B design revision: loop-set prediction (WS5.3 v2).** Predict control loops `(measured, variable, kind, actuated)` over the PFD graph with engineering masks (DOF, one-actuator-per-loop, inventory classes); render the string deterministically. Seq2seq stays as the comparability baseline. Target: ≥ 81% top-5 from 10k pairs. | The seq2seq model is a copier with a verifier outside it. Structured output puts validity and the engineering decision space inside the model and should transfer to real PFDs with hundreds, not 100k, examples. |
 | | WS0 verification: DWSIM XML tags | pending |
 | | WS0 verification: Aspen `.bkp` FLOWSHEET section | pending |

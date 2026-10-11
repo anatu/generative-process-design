@@ -1,16 +1,46 @@
 {
   "pfd2pid": {
     "published": {
-      "source": "Hirtreiter, Schulze Balhorn, Schweidtmann (2023). Towards automatic generation of control structures for PFDs with AI. arXiv:2211.05583",
-      "data": "Zenodo 7658798 synthetic PFD->P&ID pairs",
+      "source": "Hirtreiter, Schulze Balhorn, Schweidtmann (2024) AIChE J 70(1) e18259, arXiv:2211.05583; top-1 figures and graph-encoder results from Schulze Balhorn, Degens, Schweidtmann (2025) Comput Chem Eng, arXiv:2412.00508",
+      "data": "Zenodo 7658798 synthetic PFD->P&ID pairs; synthetic test split of 1,000",
       "metrics": {
-        "top1_exact": 0.748,
+        "top1_exact": 0.486,
         "top5_exact": 0.892
       },
-      "note": "Numbers as cited in generative-process-design-corpus.md. Training-set size and exact test split used for these figures to be confirmed against the paper."
+      "by_train_size": {
+        "seq2seq": {
+          "1k": {
+            "top1_exact": 0.003,
+            "top5_exact": 0.009
+          },
+          "10k": {
+            "top1_exact": 0.377,
+            "top5_exact": 0.748
+          },
+          "100k": {
+            "top1_exact": 0.486,
+            "top5_exact": 0.892
+          }
+        },
+        "graph_to_sfiles": {
+          "1k": {
+            "top1_exact": 0.152,
+            "top5_exact": 0.284
+          },
+          "10k": {
+            "top1_exact": 0.419,
+            "top5_exact": 0.732
+          },
+          "100k": {
+            "top1_exact": 0.461,
+            "top5_exact": 0.79
+          }
+        }
+      },
+      "note": "`metrics` are the 100k seq2seq figures. Corrected 2026-10-11: 74.8 / 89.2 are both top-5 (10k / 100k), not top-1 / top-5. See docs/lit_review_structured_generation.md \u00a72.2 and \u00a76."
     },
     "pass": {
-      "top5_exact": 0.80,
+      "top5_exact": 0.8,
       "top1_parses": 0.95
     },
     "ours": {

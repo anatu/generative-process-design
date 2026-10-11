@@ -17,6 +17,7 @@ designer, and section 2 explains why the public record cannot support one.
 - The plan, with workstreams, tests, fallbacks, and milestones: [`BLUEPRINT.md`](BLUEPRINT.md)
 - The inventory of 72 verified public data sources: [`generative-process-design-corpus.md`](generative-process-design-corpus.md)
 - The first experimental result: [`docs/poc0.md`](docs/poc0.md)
+- The literature behind the next design: [`docs/lit_review_structured_generation.md`](docs/lit_review_structured_generation.md)
 
 ---
 
@@ -62,7 +63,9 @@ learnable.
 
 The task is learnable. Hirtreiter, Schulze Balhorn, and Schweidtmann trained a
 transformer in 2023 to add control structures to process flow diagrams and
-reported 74.8% top-1 and 89.2% top-5 exact match on held-out flowsheets. The
+reported 74.8% top-5 exact match with ten thousand training flowsheets and
+89.2% with one hundred thousand, on held-out synthetic flowsheets; the
+corresponding top-1 figures are 37.7% and 48.6%. The
 same group showed that a language model trained on flowsheet strings can
 complete a partial flowsheet one unit at a time, as a text model completes a
 sentence. These results are the reason this project exists.
@@ -213,9 +216,9 @@ thousand pairs. The model is an encoder–decoder transformer of 7.49 million
 parameters, decoded with a beam of five. It trained in 64 minutes on one Apple
 M4 Pro.
 
-| Metric on the test split | 10,000 training pairs | 100,000 training pairs | Published |
+| Metric on the test split | 10,000 training pairs | 100,000 training pairs | Published, 100k |
 |---|---|---|---|
-| top-1 exact match | 16.5% | 42.0% | 74.8% |
+| top-1 exact match | 16.5% | 42.0% | 48.6% |
 | top-5 exact match | 35.8% | 81.1% | 89.2% |
 | top-1 output parses | 80.6% | 98.2% | |
 | top-1 equivalent to target after canonicalization | 18.0% | 45.7% | |
@@ -238,7 +241,10 @@ benchmark happened to choose the indicator.
 
 The model's second-ranked candidate was the ground truth exactly. That is the
 pattern across the test set: the correct drawing is among the model's five
-candidates 81% of the time and ranked first 42% of the time. The model knows
+candidates 81% of the time and ranked first 42% of the time. The published
+sequence model shows the same spread, 48.6% against 89.2%, which its authors
+attribute to the several valid control structures the generator admits for a
+single PFD. The model knows
 what the plausible control layers are. It does not reliably know which
 convention the benchmark applies, and nothing in its training signal tells it
 why one is preferred.
@@ -262,12 +268,12 @@ and the decision the model makes at each unit is a choice among about twelve
 options rather than a choice among 118 tokens made 130 times in a row.
 
 The two designs will be compared by how little data each needs, because that is
-the regime real data will occupy. The rule is fixed before the experiment runs.
-If the loop model, trained on ten thousand pairs, reaches the 81% top-5 that
-the string model needed one hundred thousand pairs to reach, it becomes the
-design. If it lands between 36% and 81%, both continue and the steeper learning
-curve decides. If it does no better than the string model did on ten thousand,
-it receives one week of diagnosis and is then set aside.
+the regime real data will occupy. The rule is fixed before the experiment runs, and the bars are the best
+published results at each size. At one thousand pairs the loop model must beat
+28.4% top-5, the graph-encoder result of Schulze Balhorn et al.; at ten thousand
+it must beat 74.8% top-5 and 41.9% top-1. Clearing both makes it the design.
+Clearing one keeps both models running while their learning curves decide.
+Clearing neither earns one week of diagnosis, after which it is set aside.
 
 After that comes the harvest of real flowsheets from simulator files and
 engineering exchange formats, the implementation of the 33 rules, and the
@@ -317,6 +323,10 @@ Third-party material is itemized at the end of [`LICENSE`](LICENSE).
   automatic generation of control structures for process flow diagrams with
   artificial intelligence.* 2023. [arXiv:2211.05583](https://doi.org/10.48550/arXiv.2211.05583).
   Data: [Zenodo 7658798](https://zenodo.org/records/7658798).
+- Schulze Balhorn, L., Degens, K., and Schweidtmann, A. M. *Graph-to-SFILES:
+  Control structure prediction from process topologies using generative
+  artificial intelligence.* Computers & Chemical Engineering, 2025.
+  [arXiv:2412.00508](https://arxiv.org/abs/2412.00508).
 - Vogel, G., Schulze Balhorn, L., Hirtreiter, E., and Schweidtmann, A. M.
   *SFILES 2.0: an extended text-based flowsheet representation.* Code:
   [process-intelligence-research/SFILES2](https://github.com/process-intelligence-research/SFILES2).
