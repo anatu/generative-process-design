@@ -1,114 +1,133 @@
 # Generative Process Design
 
-**Models that help chemical engineers design plants — starting with the part
-that is pure pattern work.**
+A chemical plant begins as a drawing. The process flow diagram shows the
+equipment and the streams that join it: a feed is pumped, heated, reacted, and
+separated into products. Before anything can be built, a second drawing must be
+derived from the first. The piping and instrumentation diagram adds what the
+plant needs in order to run: the valves, the sensors, and the controllers that
+hold each temperature, pressure, and liquid level where it belongs. Producing
+that second drawing is skilled, repetitive, and done by hand.
 
-A chemical process is drawn as a flowsheet: boxes for equipment, arrows for
-streams. Turning that drawing into something that can be built and run means
-adding hundreds of routine decisions — which temperatures to control, which
-valves to move, where to put a level controller. This repo builds the data,
-the validity checks, and the models to make those decisions suggestible,
-checkable, and correctable. It is a copilot, not an autonomous designer; the
-section on data explains why.
+This repository builds the data, the checks, and the models needed to produce a
+first draft of it by machine. The intended product is a copilot: software that
+proposes the next unit operation, drafts the control layer, and points out
+topological mistakes, for an engineer who decides. It is not an autonomous
+designer, and section 2 explains why the public record cannot support one.
 
-- Plan, workstreams, tests, fallbacks: [`BLUEPRINT.md`](BLUEPRINT.md)
-- Source inventory (72 verified public datasets): [`generative-process-design-corpus.md`](generative-process-design-corpus.md)
-- First result: [`docs/poc0.md`](docs/poc0.md)
+- The plan, with workstreams, tests, fallbacks, and milestones: [`BLUEPRINT.md`](BLUEPRINT.md)
+- The inventory of 72 verified public data sources: [`generative-process-design-corpus.md`](generative-process-design-corpus.md)
+- The first experimental result: [`docs/poc0.md`](docs/poc0.md)
 
 ---
 
 ## 1. The problem in one picture
 
-![PFD to P&ID example](docs/img/pfd_to_pid_example.png)
+![A process flow diagram and the piping and instrumentation diagram derived from it](docs/img/pfd_to_pid_example.png)
 
-**Top — a PFD (Process Flow Diagram).** Two feeds. One is pumped (`pp-1`)
-through a valve into a reactor (`r-1`); the other enters the reactor directly.
-The reactor has a top outlet (`tout`) and a bottom outlet (`bout`), each through
-a valve to a product. This is what a process engineer hands over: *what* the
-plant does.
+The upper drawing is a process flow diagram, a PFD. Two raw material streams
+enter from the left. One passes through a pump and a valve into a reactor; the
+other enters the reactor directly. The reactor has two outlets, marked `tout`
+and `bout` for top and bottom, and each leaves through a valve to a product.
+This is the document a process engineer produces. It states what the plant
+does and in what order.
 
-**Bottom — the P&ID (Piping and Instrumentation Diagram) for the same plant.**
-Same equipment, same streams, plus the control layer in orange: a motor (`M`)
-and pressure indicator (`PI`) on the pump, two flow controllers (`FC`) on the
-feed, a temperature indicator (`TI`) and level controller (`LC`) on the
-reactor — the level controller drives the bottoms valve — and a pressure
-controller (`PC`) driving the top-product valve. Dashed orange lines are
-control signals: *which measurement moves which valve*. This is what the plant
-is built and operated from.
+The lower drawing is the piping and instrumentation diagram, the P&ID, for the
+same plant. The equipment and streams are unchanged; what has been added, in
+orange, is the control layer. The pump has gained a motor and a pressure
+indicator, and the feed line two flow controllers, the first driving the pump
+motor and the second the valve. On the reactor sit a temperature indicator and
+a level controller, and the level controller acts on the bottoms valve, so that
+when the liquid rises the drain opens. The top outlet is held at pressure by a
+controller acting on its valve.
 
-Going from top to bottom is the task. In this example the model's output is
-identical to the ground truth.
+The dashed lines are signals. Each records which measurement moves which valve.
+A plant is built, commissioned, and operated from this drawing, and the hazard
+review that precedes start-up walks through it line by line.
 
-The decisions involved are not creative. They follow conventions that every
-process-control engineer applies by hand on every project: inventories (levels,
-pressures) must be controlled; each manipulated valve buys one controlled
-variable; a reactor gets temperature and level; a compressor gets a motor and
-pressure control. Repetitive, consequential, and encoded nowhere except in
-engineers' heads and in finished drawings.
+Going from the upper drawing to the lower one is the task studied here. In
+this instance the model's output and the ground truth are the same drawing.
 
-## 2. Why this matters, with numbers
+Nothing in the lower drawing required invention. Each addition follows a
+convention that a control engineer applies without deliberation. A vessel that
+holds liquid must have its level controlled, and the controller must act on an
+outlet. A pump needs a motor and a flow controller on its discharge. A reactor
+is held at temperature. A vapor stream leaving a vessel is held at pressure.
+The conventions are few, but a working plant has hundreds of streams, each of
+which must be considered, and every revision of the process means considering
+them all again. That combination, a small rule set applied
+exhaustively to a large structure, is what makes the task worth automating and
+what makes it learnable.
 
-**It is the bottleneck step, and it is manual.** Every plant, every
-revamp, every debottlenecking study produces a P&ID set. Control-structure
-design is done by hand from the PFD, reviewed by hand (HAZOP), and redrawn by
-hand when the process changes. There is no autocomplete.
+## 2. What is known, and what is missing
 
-**The published results say it is learnable.**
-Hirtreiter, Schulze Balhorn & Schweidtmann (2023) trained a transformer to add
-control structures to PFDs and reached **74.8% top-1 / 89.2% top-5 exact match**
-on held-out synthetic flowsheets. Graph-to-SFILES work reports 73.2% top-5 on
-related topology tasks. Flowsheet autocompletion (Vogel et al. 2023) works the
-same way, like a language model over unit operations.
+The task is learnable. Hirtreiter, Schulze Balhorn, and Schweidtmann trained a
+transformer in 2023 to add control structures to process flow diagrams and
+reported 74.8% top-1 and 89.2% top-5 exact match on held-out flowsheets. The
+same group showed that a language model trained on flowsheet strings can
+complete a partial flowsheet one unit at a time, as a text model completes a
+sentence. These results are the reason this project exists.
 
-**The data is the constraint, not the modelling.** From the source inventory:
+What those models learned from is the problem. In both studies the bulk of
+the training data was synthetic, generated from rules, and the few hundred real
+flowsheets each study used were never released: real flowsheets are scarce in
+public and encumbered in private. The table summarizes the survey behind this
+project.
 
-| Fact | Number |
+| Quantity | Value |
 |---|---|
-| Public sources verified for this project | 72 (14 direct, 27 convertible, 31 weak) |
-| Real flowsheets assemblable from all of them, after dedup | ~1,000–1,200 |
-| Training molecules behind molecular generative models (the analogy this field leans on) | ~10⁸ |
-| Largest real corpora ever assembled — all unreleased for copyright | Theisen 1,005 PFDs; Hirtreiter 312 P&IDs; Vogel 223 flowsheets |
-| Public Hirtreiter training pairs | 100,000 — **all synthetic** |
-| Digitizing drawings back into graphs (PID2Graph) | ~75% edge accuracy; needs repair and human checks |
-| Public sources carrying operating parameters, stream conditions, or economics at scale | none |
+| Public sources verified for this project | 72, of which 14 are directly usable |
+| Real flowsheets obtainable from all of them, after deduplication | about 1,000 to 1,200 |
+| Molecules behind a typical molecular generative model, for comparison | about 10⁸ |
+| The largest real corpora ever assembled, none of them released | 1,005 PFDs (Theisen); 312 P&IDs (Hirtreiter); 223 flowsheets (Vogel) |
+| Hirtreiter's public training pairs | 100,000, every one synthetic |
+| Accuracy of recovering a graph from a scanned drawing (PID2Graph) | about 75% of edges |
+| Public sources with operating conditions, sizing, or economics at scale | none |
 
-Real public topologies number ~10³. Molecular generation had ~10⁵× more. That
-gap sets the ceiling: syntactically valid flowsheets, autocompletion, control
-structures, and error correction are achievable at the published quality;
-open-ended, economically sound novel process synthesis is not. Hence a copilot.
+Molecular design has a hundred thousand times the public data that process
+design has, and the gap will not close: the drawings that would close it belong
+to the companies that commissioned them. The consequence is a ceiling. With a thousand
+real topologies and unlimited synthetic ones, a model can learn what a valid
+flowsheet looks like, complete a partial one, place a control layer, and spot
+an error, all at the accuracy the literature reports. It cannot learn to invent
+an economically sound process it has never seen, and no amount of modelling
+will change that. A copilot is what the data supports.
 
-**What this repo measured.** Same 7.5M-parameter model, same test split, only
-the training-set size changed:
+This repository's own first measurement makes the same point from the other
+side. A single model, 7.5 million parameters, was trained twice on the public
+Hirtreiter pairs: once on ten thousand of them and once on all one hundred
+thousand. Nothing else changed.
 
 | Training pairs | top-1 exact | top-5 exact | outputs that parse |
 |---|---|---|---|
 | 10,000 | 16.5% | 35.8% | 80.6% |
-| 100,000 | 42.0% | **81.1%** | **98.2%** |
+| 100,000 | 42.0% | 81.1% | 98.2% |
 
-Ten times the data moved top-5 by 45 points with the model held fixed. Data
-volume, not architecture, was binding — and the real corpus will be hundreds of
-examples, never 100k. That tension drives the next milestone (§6).
+Ten times the data raised top-5 accuracy by 45 points. Data, not architecture,
+was the limit. Real data will arrive in the hundreds, never in the hundred
+thousands, so the question that matters is which model learns from the least.
+Section 6 describes the experiment designed to answer it.
 
-## 3. How a flowsheet becomes text: SFILES 2.0
+## 3. How a flowsheet becomes a line of text
 
-Every model here reads and writes **SFILES 2.0** (Simplified Flowsheet Input
-Line Entry System), a one-line notation for a flowsheet graph modeled on
-SMILES for molecules, from TU Delft's Process Intelligence group. The whole
-grammar:
+Every model in this repository reads and writes SFILES 2.0, a notation that
+encodes a flowsheet graph as a single line of characters. It was designed on
+the pattern of SMILES, the line notation most molecular generative models were
+trained on, and extended to control structures by the TU Delft Process
+Intelligence group. The grammar is small enough to state in full.
 
 | Token | Meaning |
 |---|---|
-| `(hex)` `(dist)` `(r)` `(pp)` `(v)` `(mix)` `(splt)` … | a unit operation; ~30 classes, `raw`/`prod` for feeds and products |
-| adjacent units | a stream from one to the next |
-| `[ … ]` | a branch: a second outlet |
-| `<1` … `1` | a recycle: the stream leaves at `1` and re-enters at `<1` |
-| `<&| … &|` | a second feed stream joining a unit |
-| `n|` | start of a separate sub-flowsheet (heat integration) |
-| `{tout}` `{bout}` | stream tags: column top / bottom outlet |
-| `{1}` on two `(hex)` | the same physical heat exchanger, two sides |
-| `(C){TC}` `_1` `<_1` | SFILES 2.0: a controller (here temperature) and the signal line to what it actuates |
+| `(hex)` `(dist)` `(r)` `(pp)` `(v)` `(mix)` `(splt)` | a unit operation; about thirty classes, with `(raw)` and `(prod)` for feeds and products |
+| two units written in sequence | a stream from the first to the second |
+| `[ … ]` | a branch: a second outlet from the preceding unit |
+| `<1` … `1` | a recycle: the stream leaves at `1` and re-enters where `<1` was written |
+| `<&| … &|` | a second feed joining the preceding unit |
+| `n|` | the start of a separate sub-flowsheet, used for heat integration |
+| `{tout}` `{bout}` | a tag on the stream that follows: top or bottom outlet of a column |
+| `{1}` on two `(hex)` | the two sides of one physical heat exchanger |
+| `(C){TC}`, `_1`, `<_1` | a controller of the given type, the signal it emits, and the unit that receives it |
 
-The example above, as text:
+The drawings in section 1 are these two lines:
 
 ```
 PFD:   (raw)(pp)(v)(r)<&|(raw)&|[{bout}(v)(prod)]{tout}(v)(prod)
@@ -117,178 +136,195 @@ P&ID:  (raw)(pp)[(C){M}<_1](C){PI}(C){FC}_1(C){FC}_2(v)<_2(r)<&|(raw)&|
        [(C){TI}][(C){LC}_3][{bout}(v)<_3(prod)]{tout}(C){PC}_4(v)<_4(prod)
 ```
 
-Read the P&ID: feed → pump with a motor branch `[(C){M}<_1]` → pressure
-indicator → flow controller `_1` (its signal drives the motor) → flow
-controller `_2` → valve `<_2` (driven by `_2`) → reactor, second feed joins
-`<&|(raw)&|`; on the reactor a temperature indicator and a level controller
-`_3`; bottoms valve `<_3` driven by the level; top outlet through a pressure
-controller `_4` driving valve `<_4`.
+Read the second line from the left. The feed enters a pump. A branch off the
+pump holds a motor, which receives signal 1. Then a pressure indicator, then a
+flow controller that emits signal 1, then a second flow controller that emits
+signal 2, then the valve that receives signal 2. The reactor follows, and the
+second feed joins it. Two branches on the reactor hold a temperature indicator
+and a level controller emitting signal 3. The bottom outlet passes through the
+valve that receives signal 3. The top outlet passes a pressure controller
+emitting signal 4 and the valve that receives it.
 
-Why this representation:
-- **Lossless and canonical.** A graph becomes one string; the string parses back
-  to an isomorphic graph. The canonical string is the deduplication key.
-- **Sequence models apply directly.** PFD→P&ID is string-to-string. The
-  vocabulary is ~120 tokens.
-- **It is the field's shared format.** Every public corpus and generator in the
-  inventory speaks it.
+Three properties make the notation suitable as a learning target. The encoding
+is lossless and canonical: a graph becomes exactly one string, and the string
+parses back to an isomorphic graph, so the canonical string serves as the
+identity of a flowsheet and as the key on which duplicates are removed. The
+vocabulary is about 120 tokens, so sequence models apply without modification.
+And the format is shared: every public corpus and every generator in the
+inventory emits it.
 
-Things this codebase had to fix around the reference implementation: it
-breaks canonicalization ties by iteration order (we sort edges before
-conversion), it parses malformed strings without complaint (our grammar check
-is canonical idempotence), and it drops hot/cold side labels on heat exchangers
-in the canonical form.
+The reference implementation needed three repairs before it could serve as a
+foundation. It resolved ties in canonical ordering by dictionary iteration
+order, so the same flowsheet could produce different strings depending on how
+its graph had been built; this repository sorts every graph's edges before
+conversion. It accepted malformed strings without complaint, silently dropping
+the parts it could not place; this repository treats a string as grammatical
+only if it survives a parse and re-serialization unchanged. And it could not
+re-read strings carrying hot-side and cold-side labels on heat exchangers, so
+those labels are omitted from the canonical form.
 
-## 4. What is built
+## 4. What has been built
 
 ```
- sources (DWSIM, Aspen, Pyomo, DEXPI XML, GraphML, Modelica, Hirtreiter JSON)
-        │   one isolated extractor per source; core never imports their stacks
-        ▼
- IR JSON ──► canonical graph ──► SFILES 2.0 string ──► canonical hash (dedup)
+ sources: DWSIM, Aspen, Pyomo, DEXPI XML, GraphML, Modelica, Hirtreiter JSON
+     │   one isolated extractor per source
+     ▼
+ IR JSON ──► canonical graph ──► SFILES 2.0 string ──► canonical hash
                  │                     │
                  │                     ├──► tokenizer ──► seq2seq model ──► beam search
-                 │                     │                                     │
-                 ▼                     ▼                                     ▼
-          validity layer: grammar (G1/G2) · degree rules · 33 P&ID rules · [simulator]
+                 ▼                     ▼
+     validity layer: grammar · degree rules · 33 P&ID rules · simulator round-trip
                                        │
                                        ▼
-                       corpus: provenance + license on every record, two build profiles
+     corpus: every record carries provenance and license; two build profiles
 ```
 
-| Package | What it does | Status |
+| Component | Function | State |
 |---|---|---|
-| `gpd/canonical` | IR schema, per-source typemaps, IR→graph, SFILES2 wrapper (deterministic), canonical + Weisfeiler-Lehman hashes, graph JSON, tokenizer, frozen vocab with degree constraints | done, 90%+ coverage, mypy strict |
-| `gpd/corpus` | `Record` / `PairRecord` schemas with provenance and license | done |
-| `gpd/models` | encoder-decoder transformer, trainer, greedy + batched beam search | done (PoC-0) |
-| `gpd/eval` | benchmarks, `baselines.json` regression floor | done (PoC-0) |
-| `gpd/viz` | renders SFILES strings to drawings (the figures on this page) | done |
-| `extractors/hirtreiter` | Zenodo PFD→P&ID pairs → JSONL, upstream splits preserved | done |
-| `scripts/fetch.py` | checksummed downloads, lock file, zip-slip safe | done |
-| `gpd/validity` rules, simulator lane | the 33 engineering rules; DWSIM round-trip | WS4, not started |
-| other extractors (DWSIM, Aspen, Pyomo, DEXPI, PID2Graph, Modelica) | real-flowsheet harvest toward ~1,000 | WS1, not started |
+| `gpd/canonical` | the intermediate representation, class tables per source, graph construction, the SFILES2 wrapper, canonical and Weisfeiler–Lehman hashes, the tokenizer, the frozen vocabulary with degree constraints | complete; type-checked strictly; property-tested |
+| `gpd/corpus` | record schemas with provenance and license | complete |
+| `gpd/models` | encoder–decoder transformer, trainer, greedy and beam decoding | complete for the first experiment |
+| `gpd/eval` | benchmarks and the regression floor in `baselines.json` | complete for the first experiment |
+| `gpd/viz` | renders any SFILES string as a drawing; produced the figures on this page | complete |
+| `extractors/hirtreiter` | converts the Zenodo pairs, preserving the authors' splits | complete |
+| `scripts/fetch.py` | downloads with checksums and a lock file | complete |
+| `gpd/validity` | the 33 engineering rules; the simulator lane | not started |
+| extractors for DWSIM, Aspen, Pyomo, DEXPI, PID2Graph, Modelica | the harvest of real flowsheets | not started |
 
-Design rules that matter (BLUEPRINT §2–3):
-- Every extractor runs in its own environment and emits a common IR. The core
-  package never imports IDAES, WaterTAP, BioSTEAM, or pyDEXPI (AGPL). Enforced
-  by `import-linter`.
-- Every record carries provenance and license. Two build profiles: `research`
-  (everything) and `commercial` (no non-commercial licenses, no unconfirmed
-  ones). The commercial build fails hard on an unknown license.
-- Property tests (Hypothesis) generate random valid flowsheets and check
-  graph→string→graph round trips, canonical invariance under relabeling and
-  edge reordering, and hash invariance. They found a real canonicalization
-  instability on day one.
+Three decisions shape the code. Every source parser runs in its own
+environment and emits one shared intermediate representation, so that the core
+package never imports IDAES, WaterTAP, BioSTEAM, or pyDEXPI; the dependency
+stacks conflict, and pyDEXPI's license would otherwise attach to everything.
+An import checker enforces the boundary. Every record carries its provenance
+and license, and the corpus builds in two profiles, one that includes every
+source and one that refuses any license that is non-commercial or unconfirmed.
+And the canonical layer is tested by property: a generator produces random
+valid flowsheets, and the tests require that each survives a round trip to
+string and back, that its canonical string does not change when its nodes are
+renumbered or its edges reordered, and that its hashes are likewise invariant.
+The second of these tests failed on the first day and exposed the
+tie-breaking defect described above.
 
-## 5. Results so far: PoC-0
+## 5. The first result
 
-Task: PFD → P&ID on the Hirtreiter benchmark (Zenodo 7658798, CC-BY-4.0,
-synthetic). 7.49M-parameter encoder-decoder transformer, beam 5, evaluated on
-the authors' 1,000-pair test split. Trained on an Apple M4 Pro in 64 minutes.
+The benchmark is the Hirtreiter dataset: synthetic pairs of PFD and P&ID
+strings, published under CC-BY-4.0, with the authors' own test split of one
+thousand pairs. The model is an encoder–decoder transformer of 7.49 million
+parameters, decoded with a beam of five. It trained in 64 minutes on one Apple
+M4 Pro.
 
-| Metric | 10k pairs | **100k pairs** | Published | Pass bar |
-|---|---|---|---|---|
-| top-1 exact match | 16.5% | **42.0%** | 74.8% | — |
-| top-5 exact match | 35.8% | **81.1%** | 89.2% | ≥ 80% ✓ |
-| top-1 output parses | 80.6% | **98.2%** | — | ≥ 95% ✓ |
-| top-1 canonical-equivalent to target | 18.0% | 45.7% | — | — |
+| Metric on the test split | 10,000 training pairs | 100,000 training pairs | Published |
+|---|---|---|---|
+| top-1 exact match | 16.5% | 42.0% | 74.8% |
+| top-5 exact match | 35.8% | 81.1% | 89.2% |
+| top-1 output parses | 80.6% | 98.2% | |
+| top-1 equivalent to target after canonicalization | 18.0% | 45.7% | |
 
-Exact match is strict: one wrong tag, recycle number, or branch order is a
-miss. Full write-up with training curves and observations: [`docs/poc0.md`](docs/poc0.md).
+Exact match is unforgiving. A single misplaced tag, a recycle numbered
+differently, or a branch written in the other order counts as a miss. The
+training curves and a fuller discussion are in [`docs/poc0.md`](docs/poc0.md).
 
-### A near miss, and what it says about the model
+![Ground-truth P&ID above the model's first choice; they differ by one controller on the reactor](docs/img/near_miss.png)
 
-![near miss](docs/img/near_miss.png)
+The figure shows a miss. In this plant two feeds are mixed, compressed, and
+reacted; the bottoms go to product, and the tops pass through a tank on the way
+to a second product. Above is the ground truth; below, the model's first
+choice. They agree everywhere except at the
+reactor, where the truth has a temperature indicator and the model placed a
+temperature controller with a signal back to the reactor. From that point every
+signal number in the string is shifted by one, so the entire output is scored
+wrong. Both choices are defensible engineering. The rules that generated the
+benchmark happened to choose the indicator.
 
-Ground truth (top) vs the model's first choice (bottom). The plant: two feeds
-mixed, compressed, reacted; bottoms to product; tops through a tank to
-product. Everything matches except one decision on the reactor: the truth has
-a temperature **indicator** (`TI`, measure only); the model put a temperature
-**controller** (`TC`) with a signal line back to the reactor. Every signal
-number downstream shifts by one, so the whole string counts as wrong. Both are
-defensible engineering; the benchmark's generator chose the indicator.
+The model's second-ranked candidate was the ground truth exactly. That is the
+pattern across the test set: the correct drawing is among the model's five
+candidates 81% of the time and ranked first 42% of the time. The model knows
+what the plausible control layers are. It does not reliably know which
+convention the benchmark applies, and nothing in its training signal tells it
+why one is preferred.
 
-The model's second-ranked hypothesis was the exact ground truth. Across the
-test set that is the pattern: the right answer is in the top 5 for 81% of
-cases but ranked first for only 42%. The model knows the candidates; it does
-not reliably know which engineering convention applies. That is the gap the
-next milestone attacks.
+## 6. The next experiment
 
-## 6. What is next: PoC-1, the output-space bake-off
+The model of section 5 writes the P&ID character by character. Most of what it
+writes is a copy of the PFD it was given, and every error it makes is a syntax
+error before it is an engineering error. The validity checks sit outside it,
+where they can reject an output but not improve one.
 
-The string model regenerates the entire PFD character by character and
-sprinkles controllers in. ~60% of each output is copying. Every error is a
-syntax error before it is an engineering error, and the validity layer sits
-outside the generator.
+The alternative, specified in the blueprint, is to predict the control layer as
+a set of loops over the PFD graph. Each loop names the unit measured, the
+variable (flow, temperature, pressure, or level), whether it is controlled or
+merely indicated, and the valve it actuates. Engineering invariants become
+constraints on the prediction rather than checks after it: one valve per loop,
+level control only on units that hold inventory, a count of actuators that does
+not exceed the count of streams available to manipulate. The string is then
+rendered from the graph and the loops, so it is grammatical by construction,
+and the decision the model makes at each unit is a choice among about twelve
+options rather than a choice among 118 tokens made 130 times in a row.
 
-The alternative, specified in BLUEPRINT §WS5.3 v2: predict the P&ID as a
-**set of control loops over the PFD graph** — `(measured unit, variable
-F/T/P/L, controller or indicator, actuated valve)` — with engineering invariants
-(one valve per loop, degrees-of-freedom balance, levels only on
-inventory-holding units) as hard masks, and render the string
-deterministically. Topology is copied by construction; the decision space is
-~12 choices per unit instead of 118 tokens × 130 steps.
+The two designs will be compared by how little data each needs, because that is
+the regime real data will occupy. The rule is fixed before the experiment runs.
+If the loop model, trained on ten thousand pairs, reaches the 81% top-5 that
+the string model needed one hundred thousand pairs to reach, it becomes the
+design. If it lands between 36% and 81%, both continue and the steeper learning
+curve decides. If it does no better than the string model did on ten thousand,
+it receives one week of diagnosis and is then set aside.
 
-The two are judged by **data efficiency at 1k–10k pairs**, the regime real
-data will be in. The decision rule is fixed in advance (BLUEPRINT §8): the loop
-model, trained on 10k, must reach the 81% top-5 that the string model needed
-100k for — then it becomes Task B. Between 36% and 81%, both continue and the
-scaling slope decides. Below 36%, one week of debugging and then back to the
-string model.
+After that comes the harvest of real flowsheets from simulator files and
+engineering exchange formats, the implementation of the 33 rules, and the
+copilot interface.
 
-After that: the WS1 simulator harvest (DWSIM, Aspen, Pyomo, DEXPI) toward
-~1,000 real flowsheets, the 33-rule validity layer, and the copilot API.
-
-## 7. Quick start
+## 7. Running it
 
 ```sh
 make install                      # uv sync, Python 3.11; SFILES2 is a pinned submodule
-make check                        # ruff + mypy + import contracts + 150 tests (<1 min)
+make check                        # ruff, mypy, import contracts, 150 tests; under a minute
 
-uv sync --extra models            # PyTorch (CPU wheel on Linux, MPS on macOS)
-make poc0                         # fetch Hirtreiter → JSONL → train → beam-5 eval
+uv sync --extra models            # PyTorch; CPU wheel on Linux, Metal on macOS
+make poc0                         # fetch Hirtreiter → JSONL → train → beam-5 evaluation
 
-# draw any flowsheet
 uv run python -m gpd.viz --pfd "(raw)(hex)(dist)[{tout}(prod)]{bout}(prod)" --out fs.png
 ```
 
-`make help` lists every target. CI runs the same `make check` on every push.
+`make help` lists every target. Continuous integration runs `make check` on
+every push.
 
 ## 8. Layout
 
 ```
-gpd/canonical/     IR schema, typemaps, IR→graph, SFILES2 wrapper, hashing, tokenizer, vocab
-gpd/corpus/        Record / PairRecord schemas
-gpd/models/        seq2seq transformer, trainer, greedy + beam decoding
-gpd/eval/          benchmarks + baselines.json regression gate
-gpd/viz.py         flowsheet renderer
-extractors/        isolated source parsers → IR JSON (hirtreiter so far)
-scripts/           fetch.py + sources.yaml (checksummed downloads, lock file)
-docs/              poc0.md, figures
-tests/             unit / property (Hypothesis) / integration
-third_party/SFILES2  pinned submodule (MIT)
+gpd/canonical/       intermediate representation, class tables, graph construction, SFILES2 wrapper, hashing, tokenizer, vocabulary
+gpd/corpus/          record schemas
+gpd/models/          transformer, trainer, decoding
+gpd/eval/            benchmarks, baselines.json
+gpd/viz.py           flowsheet renderer
+extractors/          one isolated parser per source; hirtreiter so far
+scripts/             fetch.py and sources.yaml
+docs/                poc0.md and figures
+tests/               unit, property, and integration tests
+third_party/SFILES2  pinned submodule, MIT
 ```
 
 ## 9. Data and licenses
 
 Nothing under `data/` is committed. `scripts/sources.yaml` lists every source
-with URL, license, size, and checksum; `scripts/sources.lock.json` records what
-was fetched and its hash. The Hirtreiter pairs are **synthetic** (CC-BY-4.0);
-the 312 real pairs from the paper are not public. Code is MIT; third-party
-material is listed at the bottom of [`LICENSE`](LICENSE).
+with its URL, license, size, and checksum, and `scripts/sources.lock.json`
+records each fetch. The Hirtreiter pairs are synthetic and carry CC-BY-4.0; the
+312 real pairs described in the paper were never released. The code is MIT.
+Third-party material is itemized at the end of [`LICENSE`](LICENSE).
 
 ## 10. References
 
-- Hirtreiter, Schulze Balhorn, Schweidtmann. *Towards automatic generation of
-  control structures for process flow diagrams with artificial intelligence.*
-  2023. [arXiv:2211.05583](https://doi.org/10.48550/arXiv.2211.05583). Data:
-  [Zenodo 7658798](https://zenodo.org/records/7658798).
-- Vogel, Schulze Balhorn, Hirtreiter, Schweidtmann. *SFILES 2.0: an extended
-  text-based flowsheet representation.* Code:
+- Hirtreiter, E., Schulze Balhorn, L., and Schweidtmann, A. M. *Towards
+  automatic generation of control structures for process flow diagrams with
+  artificial intelligence.* 2023. [arXiv:2211.05583](https://doi.org/10.48550/arXiv.2211.05583).
+  Data: [Zenodo 7658798](https://zenodo.org/records/7658798).
+- Vogel, G., Schulze Balhorn, L., Hirtreiter, E., and Schweidtmann, A. M.
+  *SFILES 2.0: an extended text-based flowsheet representation.* Code:
   [process-intelligence-research/SFILES2](https://github.com/process-intelligence-research/SFILES2).
-- Vogel, Schulze Balhorn, Schweidtmann. *Learning from flowsheets: a generative
-  transformer model for autocompletion of flowsheets.* Computers & Chemical
-  Engineering, 2023.
-- Rule-based P&ID autocorrection (33 rules): [arXiv:2502.18493](https://arxiv.org/abs/2502.18493).
-- PID2Graph (DLR): [Zenodo 14803338](https://zenodo.org/records/14803338).
-- Full inventory with licenses and verification status:
+- Vogel, G., Schulze Balhorn, L., and Schweidtmann, A. M. *Learning from
+  flowsheets: a generative transformer model for autocompletion of flowsheets.*
+  Computers & Chemical Engineering, 2023.
+- Rule-based correction of P&IDs, the source of the 33 rules:
+  [arXiv:2502.18493](https://arxiv.org/abs/2502.18493).
+- PID2Graph, the drawing-to-graph dataset: [Zenodo 14803338](https://zenodo.org/records/14803338).
+- The full source inventory with licenses and verification status:
   [`generative-process-design-corpus.md`](generative-process-design-corpus.md).
