@@ -1,0 +1,18 @@
+{
+  "pfd2pid": {
+    "published": {
+      "source": "Hirtreiter, Schulze Balhorn, Schweidtmann (2023). Towards automatic generation of control structures for PFDs with AI. arXiv:2211.05583",
+      "data": "Zenodo 7658798 synthetic PFD->P&ID pairs",
+      "metrics": {
+        "top1_exact": 0.748,
+        "top5_exact": 0.892
+      },
+      "note": "Numbers as cited in generative-process-design-corpus.md. Training-set size and exact test split used for these figures to be confirmed against the paper."
+    },
+    "pass": {
+      "top5_exact": 0.80,
+      "top1_parses": 0.95
+    },
+    "ours": null
+  }
+}

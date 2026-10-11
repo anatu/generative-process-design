@@ -1,0 +1,45 @@
+# DWSIM unit-operation classes -> SFILES 2.0 classes (BLUEPRINT WS1.1).
+# PARTIAL. Keys are matched on the full .NET class name first, then on the last
+# dotted segment. Verify the full names against real .dwxmz files in WS1.1 and
+# extend. Unmapped classes fall back to `default`.
+source: dwsim
+default: X
+classes:
+  Heater: hex
+  Cooler: hex
+  HeatExchanger: hex
+  AirCooler: hex
+  Pump: pp
+  Compressor: comp
+  Expander: turb
+  Valve: v
+  Mixer: mix
+  Splitter: splt
+  Vessel: flash            # DWSIM "Separator" vessel (flash drum)
+  Tank: tank
+  DistillationColumn: dist
+  ShortcutColumn: dist
+  AbsorptionColumn: abs
+  ComponentSeparator: sep
+  SolidsSeparator: sep
+  Filter: lfil
+  OrificePlate: orif
+  Pipe: pipe
+  Reactor_Conversion: r
+  Reactor_Equilibrium: r
+  Reactor_Gibbs: r
+  Reactor_CSTR: r
+  Reactor_PFR: r
+ports:
+  # DWSIM column connector names -> SFILES column tags (verify in WS1.1)
+  Distillate: tout
+  Bottoms: bout
+  Overhead: tout
+  Vapor: tout
+  Liquid: bout
+  Feed: tin
+  # Heat exchanger sides
+  HotIn: hot_in
+  HotOut: hot_out
+  ColdIn: cold_in
+  ColdOut: cold_out

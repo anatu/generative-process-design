@@ -1,0 +1,94 @@
+# Raw data sources (BLUEPRINT §2.2, WS0 deliverable 4).
+#
+# kind: http  -> download `url` to data/raw/<name>/<filename>, verify sha256, extract.
+# kind: git   -> shallow clone `url` at `ref` into data/raw/<name>/repo.
+# kind: manual -> not automatable yet; `notes` says what to do.
+#
+# sha256: null means "record on first fetch". The recorded value lands in
+# scripts/sources.lock.json and is verified on every later fetch. Promote it
+# into this file once reviewed.
+
+sources:
+  hirtreiter:
+    kind: http
+    url: "https://zenodo.org/records/7658798/files/Training%20Data%20Public%20Upload.zip?download=1"
+    filename: hirtreiter_training_data.zip
+    sha256: f3216d96c04286813f8c55df249fb6d376d58944c11e85fa9bc581f403256cc7
+    extract: zip
+    license: CC-BY-4.0
+    tier: A
+    size_mb: 25
+    expected: "100 / 1k / 10k / 100k synthetic PFD->P&ID pairs, 1k test, 1k eval; _wo_valves variants; augmented sets"
+    notes: "SYNTHETIC only. The 312 real pairs from the paper are withheld. Tag is_real=false."
+
+  dexpi_training_test_cases:
+    kind: git
+    url: https://gitlab.com/dexpi/TrainingTestCases.git
+    ref: main
+    license: CC-BY-4.0
+    tier: A
+    size_mb: 60
+    expected: "~220 Proteus XML files, ~83 case folders, ~14 realistic P&IDs"
+    notes: "Pin `ref` to the commit recorded in sources.lock.json after first fetch."
+
+  text2flowsheet_code:
+    kind: http
+    url: "https://zenodo.org/records/19910216/files/text2flowsheet.zip?download=1"
+    filename: text2flowsheet.zip
+    sha256: null
+    extract: zip
+    license: CC-BY-4.0
+    tier: D
+    size_mb: 2
+    expected: "ETH Text-to-Flowsheet pipeline code; 101-flowsheet expert benchmark"
+
+  pid2graph:
+    kind: http
+    url: "https://zenodo.org/records/14803338/files/PID2Graph.zip?download=1"
+    filename: PID2Graph.zip
+    sha256: null
+    extract: zip
+    license: CC-BY-SA-4.0
+    tier: A
+    size_mb: 9304
+    expected: "772 P&IDs: 72 real + 700 random-topology synthetic; GraphML + PNG"
+    notes: "9.3 GB. Share-alike propagates to derived datasets. Fetch on demand only."
+
+  pid_dataset:
+    kind: http
+    url: "https://zenodo.org/records/8028570/files/PID_Dataset.zip?download=1"
+    filename: PID_Dataset.zip
+    sha256: null
+    extract: zip
+    license: CC-BY-4.0
+    tier: C
+    size_mb: 6686
+    expected: "real/scraped P&ID images for digitizer training"
+    notes: "6.7 GB. Phase 3 only."
+
+  dwsim_builtin_samples:
+    kind: git
+    url: https://github.com/DanWBR/dwsim.git
+    ref: master
+    license: GPL-3.0
+    tier: A
+    size_mb: 2000
+    expected: "~186 .dwxmz/.dwxml sample flowsheets inside the repo"
+    notes: "Large repo. WS1.1 should switch this to a sparse checkout of the samples directory once its path is confirmed."
+
+  fossee_dwsim:
+    kind: manual
+    url: https://dwsim.fossee.in/flowsheeting-project/completed-flowsheet
+    license: pending
+    tier: A
+    expected: "275 completed .dwxmz flowsheets"
+    notes: "Gallery pages; needs a scraper in WS1.1. License unconfirmed - email sent? (see BLUEPRINT §9)."
+
+  dwsim_flowsheets_mirror:
+    kind: git
+    url: https://github.com/Sashi20/DWSIM-Flowsheets.git
+    ref: main
+    license: unknown
+    tier: A
+    size_mb: 300
+    expected: "194 FOSSEE snapshot projects (.dwxmz); overlaps fossee_dwsim"

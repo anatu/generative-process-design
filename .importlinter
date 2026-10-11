@@ -1,0 +1,31 @@
+[importlinter]
+root_package = gpd
+include_external_packages = True
+
+# BLUEPRINT D4: core never imports isolated extractor dependencies.
+[importlinter:contract:no-isolated-deps]
+name = core must not import extractor-only or AGPL dependencies
+type = forbidden
+source_modules =
+    gpd
+forbidden_modules =
+    idaes
+    watertap
+    biosteam
+    pyomo
+    pydexpi
+    win32com
+
+# BLUEPRINT §2.1: layering. Lower layers never import higher ones.
+[importlinter:contract:layers]
+name = package layering
+type = layers
+layers =
+    gpd.serve
+    gpd.eval
+    gpd.models
+    gpd.corpus
+    gpd.synth | gpd.extract
+    gpd.validity
+    gpd.canonical
+    gpd.util

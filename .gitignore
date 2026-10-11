@@ -1,0 +1,42 @@
+# data: raw and derived are never committed; fixtures live in tests/fixtures
+data/raw/*
+data/interim/*
+data/corpus/*
+!data/**/.gitkeep
+
+# python
+__pycache__/
+*.py[cod]
+*.egg-info/
+dist/
+build/
+.venv/
+.python-version.local
+
+# tooling caches
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.hypothesis/
+.coverage
+.coverage.*
+htmlcov/
+
+# experiment tracking / model artifacts
+wandb/
+mlruns/
+runs/
+eval/runs/
+checkpoints/
+*.pt
+*.ckpt
+*.safetensors
+
+# secrets
+.env
+.env.*
+
+# os / editor
+.DS_Store
+.idea/
+.vscode/
